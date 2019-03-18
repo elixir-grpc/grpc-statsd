@@ -1,0 +1,2 @@
+defmodule GRPCStatsd do
+end
