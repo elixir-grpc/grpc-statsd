@@ -1,9 +1,30 @@
 defmodule GRPCStatsd.ServerInterceptor do
+  @moduledoc """
+
+  Define your interceptor and use it in endpoint
+
+    defmodule YourService.ServerInterceptor do
+      # optional
+      #   * time_unit: :millisecond
+      use GRPCStatsd.ServerInterceptor, statsd_module: Statix
+    end
+
+    defmodule YourService.Grpc.Endpoint do
+      use GRPC.Endpoint
+
+      intercept YourService.Grpc.ServerInterceptor
+      ...
+    end
+  """
   defmacro __using__(opts) do
     quote do
       @behaviour GRPC.ServerInterceptor
 
-      @statsd unquote(opts[:statsd_module] || Statix)
+      @statsd unquote(opts[:statsd_module])
+      if !@statsd do
+        raise "You have to specify :statsd_module as GRPC.ServerInterceptor's option"
+      end
+
       @time_unit unquote(opts[:time_unit] || :millisecond)
       @default_tags unquote(opts[:default_tags] || [])
 
@@ -11,8 +32,22 @@ defmodule GRPCStatsd.ServerInterceptor do
         opts
       end
 
-      def call(req, %{grpc_type: grpc_type, __interface__: interface} = stream, next, opts) do
-        tags = ["grpc_service:#{stream.service_name}", "grpc_method:#{stream.method_name}", "grpc_type:#{grpc_type}"|@default_tags]
+      def call(
+            req,
+            %{
+              grpc_type: grpc_type,
+              __interface__: interface,
+              service_name: service_name,
+              method_name: method_name
+            } = stream,
+            next,
+            opts
+          ) do
+        tags = [
+          "grpc_service:#{service_name}",
+          "grpc_method:#{method_name}",
+          "grpc_type:#{grpc_type}" | @default_tags
+        ]
 
         @statsd.increment("grpc.server.started_total", 1, tags: tags)
 
@@ -33,7 +68,10 @@ defmodule GRPCStatsd.ServerInterceptor do
         end
 
         start = System.monotonic_time()
-        result = next.(req, %{stream | __interface__: Map.put(interface, :send_reply, send_reply)})
+
+        result =
+          next.(req, %{stream | __interface__: Map.put(interface, :send_reply, send_reply)})
+
         stop = System.monotonic_time()
 
         code =
