@@ -17,7 +17,7 @@ defmodule GRPCStatsd.ServerInterceptor do
     end
   """
   defmacro __using__(opts) do
-    quote do
+    quote location: :keep do
       @behaviour GRPC.ServerInterceptor
 
       @statsd unquote(opts[:statsd_module])
@@ -61,41 +61,59 @@ defmodule GRPCStatsd.ServerInterceptor do
             req
           end
 
-        send_reply = fn stream, reply ->
-          stream = interface[:send_reply].(stream, reply)
+        send_reply = fn stream, reply, opts ->
+          stream = interface[:send_reply].(stream, reply, opts)
           @statsd.increment("grpc.server.msg_sent_total", 1, tags: tags)
           stream
         end
 
         start = System.monotonic_time()
 
-        result =
-          next.(req, %{stream | __interface__: Map.put(interface, :send_reply, send_reply)})
+        try do
+          result =
+            next.(req, %{stream | __interface__: Map.put(interface, :send_reply, send_reply)})
 
-        stop = System.monotonic_time()
+          stop = System.monotonic_time()
 
-        code =
-          case result do
-            {:ok, _} ->
-              GRPC.Status.code_name(0)
+          code =
+            case result do
+              {:ok, _} ->
+                GRPC.Status.code_name(0)
 
-            {:ok, _, _} ->
-              GRPC.Status.code_name(0)
+              {:ok, _, _} ->
+                GRPC.Status.code_name(0)
 
-            {:error, %GRPC.RPCError{} = error} ->
-              GRPC.Status.code_name(error.status)
+              # For compitable with older versions
+              {:error, %GRPC.RPCError{} = error} ->
+                GRPC.Status.code_name(error.status)
 
-            {:error, _} ->
-              GRPC.Status.code_name(GRPC.Status.unknown())
-          end
+              {:error, _} ->
+                GRPC.Status.code_name(GRPC.Status.unknown())
+            end
 
-        tags_with_code = ["grpc_code:#{code}" | tags]
-        @statsd.increment("grpc.server.handled_total", 1, tags: tags_with_code)
+            tags_with_code = ["grpc_code:#{code}" | tags]
+            @statsd.increment("grpc.server.handled_total", 1, tags: tags_with_code)
 
-        time = System.convert_time_unit(stop - start, :native, @time_unit)
-        @statsd.histogram("grpc.server.handled_latency", time, tags: tags_with_code)
+            time = System.convert_time_unit(stop - start, :native, @time_unit)
+            @statsd.histogram("grpc.server.handled_latency", time, tags: tags_with_code)
 
-        result
+            result
+        rescue
+          error in GRPC.RPCError ->
+            code = GRPC.Status.code_name(error.status)
+            stop = System.monotonic_time()
+
+            tags_with_code = ["grpc_code:#{code}" | tags]
+            @statsd.increment("grpc.server.handled_total", 1, tags: tags_with_code)
+
+            time = System.convert_time_unit(stop - start, :native, @time_unit)
+            @statsd.histogram("grpc.server.handled_latency", time, tags: tags_with_code)
+
+            reraise error, __STACKTRACE__
+        catch
+          kind, value ->
+            reraise Exception.normalize(kind, value, __STACKTRACE__), __STACKTRACE__
+        end
       end
     end
   end
