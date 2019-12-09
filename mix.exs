@@ -1,4 +1,4 @@
-defmodule GrpcStatsd.MixProject do
+defmodule GRPCStatsd.MixProject do
   use Mix.Project
 
   def project do
@@ -7,6 +7,7 @@ defmodule GrpcStatsd.MixProject do
       version: "0.1.0",
       elixir: "~> 1.4",
       start_permanent: Mix.env() == :prod,
+      package: package(),
       deps: deps()
     ]
   end
@@ -16,6 +17,15 @@ defmodule GrpcStatsd.MixProject do
     [
       extra_applications: [:logger]
     ]
+  end
+
+  defp package do
+    %{
+      maintainers: ["Bing Han"],
+      licenses: ["MIT"],
+      links: %{"GitHub" => "https://github.com/elixir-grpc/grpc-statsd"},
+      files: ~w(.formatter.exs mix.exs lib)
+    }
   end
 
   # Run "mix help deps" to learn about dependencies.

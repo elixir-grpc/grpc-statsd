@@ -91,13 +91,13 @@ defmodule GRPCStatsd.ServerInterceptor do
                 GRPC.Status.code_name(GRPC.Status.unknown())
             end
 
-            tags_with_code = ["grpc_code:#{code}" | tags]
-            @statsd.increment("grpc.server.handled_total", 1, tags: tags_with_code)
+          tags_with_code = ["grpc_code:#{code}" | tags]
+          @statsd.increment("grpc.server.handled_total", 1, tags: tags_with_code)
 
-            time = System.convert_time_unit(stop - start, :native, @time_unit)
-            @statsd.histogram("grpc.server.handled_latency", time, tags: tags_with_code)
+          time = System.convert_time_unit(stop - start, :native, @time_unit)
+          @statsd.histogram("grpc.server.handled_latency", time, tags: tags_with_code)
 
-            result
+          result
         rescue
           error in GRPC.RPCError ->
             code = GRPC.Status.code_name(error.status)
