@@ -8,6 +8,7 @@ defmodule GRPCStatsd.MixProject do
       elixir: "~> 1.4",
       start_permanent: Mix.env() == :prod,
       package: package(),
+      description: "statsd interceptor/middleware for https://github.com/elixir-grpc/grpc",
       deps: deps()
     ]
   end
@@ -32,7 +33,8 @@ defmodule GRPCStatsd.MixProject do
   defp deps do
     [
       {:statix, ">= 0.0.0", optional: true},
-      {:grpc, ">= 0.0.0", optional: true}
+      {:grpc, ">= 0.0.0", optional: true},
+      {:ex_doc, ">= 0.0.0", only: :dev, runtime: false}
     ]
   end
 end
